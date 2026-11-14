@@ -14,11 +14,11 @@ This is not a marine chartplotter or a safe-route engine. Routes are drawn manua
 
 Weather labels are BoatMate heuristics, not official sea-state categories or a safety assessment. River estimates use wind and gusts only. Coastal estimates also use modelled significant wave height and period, which do not resolve sheltered bays, reefs, wakes or local tidal effects. Missing data is shown as unavailable; storms, fog and heavy rain override comfort labels. No marine warning feed is integrated. Users must check current BOM warnings and official charts/notices.
 
-The weather screen explains all classification thresholds. Forecasts refresh on demand, when reopened after 30 minutes, and while visible. Fetched time is retrieval time, not model issue time. No API key or paid backend is used. Internet is required for maps and forecasts. Saved spots and routes are local to the browser and are lost if its storage is cleared.
+The weather screen explains all classification thresholds. Forecasts refresh on demand, when reopened after 30 minutes, and while visible. Updated time is the forecast download time, not model issue time. No API key or paid backend is used. Internet is required for maps and forecasts. Saved spots and routes are local to the browser and are lost if its storage is cleared.
 
 ## Hosting and data
 
-GitHub Pages serves `main` at the repository root with HTTPS. `.nojekyll` disables Jekyll processing. `index.html` includes the app logic and styling; Leaflet is loaded from unpkg.
+GitHub Pages is deployed by `.github/workflows/deploy.yml` on pushes and hourly (minute 17). The workflow downloads forecasts with `update_weather.py`, then deploys only index.html, weather.json and .nojekyll. Scheduled runs may be delayed or disabled by GitHub after repository inactivity; forecasts older than three hours are refused. Live API requests are a fallback. `index.html` includes the app logic and styling; Leaflet is loaded from unpkg.
 
 Data providers:
 - OpenStreetMap contributors / Leaflet for the base map.
