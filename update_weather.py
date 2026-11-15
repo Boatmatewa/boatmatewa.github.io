@@ -14,6 +14,10 @@ PLACES = {
     'rottnest': (-32.01, 115.62, True),
 }
 
+class ForecastUnavailable(RuntimeError):
+    """Expected provider outage or invalid forecast response."""
+
+
 def request(host, lat, lon, marine=False):
     params = {
         'latitude': lat, 'longitude': lon,
@@ -35,16 +39,20 @@ def request(host, lat, lon, marine=False):
             error = exc
             if attempt < 2:
                 time.sleep(2)
-    raise RuntimeError('Forecast download failed') from error
+    raise ForecastUnavailable('Forecast download failed') from error
 
 def load_place(item):
     key, (lat, lon, coastal) = item
-    weather = request('https://api.open-meteo.com/v1/forecast', lat, lon)
+    try:
+        weather = request('https://api.open-meteo.com/v1/forecast', lat, lon)
+    except ForecastUnavailable:
+        print(key + ': forecast unavailable after retries; no stale data published')
+        return key, None
     marine = None
     if coastal:
         try:
             marine = request('https://marine-api.open-meteo.com/v1/marine', lat, lon, True)
-        except RuntimeError:
+        except ForecastUnavailable:
             # The UI refuses to label coastal comfort without wave data.
             print(key + ': wave data unavailable')
     return key, {'weather': weather, 'marine': marine}
@@ -53,9 +61,16 @@ def main():
     result = {'fetched_at': int(time.time()), 'places': {}}
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         for key, data in executor.map(load_place, PLACES.items()):
-            result['places'][key] = data
-            print(key + ': forecast downloaded')
-    pathlib.Path('weather.json').write_text(json.dumps(result, separators=(',', ':')))
+            if data is not None:
+                result['places'][key] = data
+                print(key + ': forecast downloaded')
+    # Always replace the checked-in snapshot, even during a complete outage.
+    # Missing places trigger the app's unavailable state/live fallback.
+    # Never give old forecast values a new freshness timestamp.
+    target = pathlib.Path('weather.json')
+    pending = target.with_suffix('.tmp')
+    pending.write_text(json.dumps(result, separators=(',', ':')))
+    pending.replace(target)
     print('Saved fresh forecasts for ' + str(len(result['places'])) + ' locations')
 
 if __name__ == '__main__':
